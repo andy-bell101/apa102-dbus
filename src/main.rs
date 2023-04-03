@@ -47,11 +47,9 @@ impl RustApa102 {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let num_leds = 16;
-    let clock_pin = 1;
-    let data_pin = 2;
-    let clock_rate = 0.0f32;
+    let clock_rate = 1_500_000;
     let inst = RustApa102 {
-        frames: Frames::new(num_leds, data_pin, clock_pin, clock_rate),
+        frames: Frames::new(num_leds, clock_rate),
     };
     let _conn = ConnectionBuilder::session()?
         .name("org.zbus.rust_apa102")?

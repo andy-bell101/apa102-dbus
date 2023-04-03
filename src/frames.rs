@@ -1,7 +1,6 @@
 use std::{thread, time};
 
-use bitvec::prelude::*;
-use rppal::gpio::{Gpio, Level, OutputPin};
+use rppal::spi::{Bus, Mode, SlaveSelect, Spi};
 
 #[derive(Debug, PartialEq)]
 pub struct LEDState {
@@ -74,21 +73,17 @@ impl LEDState {
 
 pub struct Frames {
     state: LEDState,
-    buffer: Vec<u32>,
+    buffer: Vec<u8>,
     num_leds: u16,
-    data_pin: u8,
-    clock_pin: u8,
-    clock_rate: f32,
+    clock_rate: u32,
 }
 
 impl Frames {
-    pub fn new(num_leds: u16, data_pin: u8, clock_pin: u8, clock_rate: f32) -> Self {
+    pub fn new(num_leds: u16, clock_rate: u32) -> Self {
         Self {
             state: LEDState::new(0, 0, 0, 0, 0.0),
             buffer: Self::initialise_frames(&num_leds),
             num_leds,
-            data_pin,
-            clock_pin,
             clock_rate,
         }
     }
@@ -97,11 +92,11 @@ impl Frames {
         self.state = state;
     }
 
-    fn get_start_frame() -> u32 {
-        0
+    fn get_start_frame() -> [u8; 4] {
+        [0; 4]
     }
 
-    fn get_led_frame(led_state: &LEDState) -> u32 {
+    fn get_led_frame(led_state: &LEDState) -> [u8; 4] {
         let LEDState {
             brightness,
             blue,
@@ -111,34 +106,32 @@ impl Frames {
         } = *led_state;
         // ignore any brightness values that are too high
         let first_bits: u8 = 0b1110_0000;
-        let mod_brightness: u32 = ((first_bits | brightness) as u32) << 24;
-        mod_brightness | ((blue as u32) << 16) | ((green as u32) << 8) | (red as u32)
+        [first_bits | brightness, blue, green, red]
     }
 
-    fn get_end_frame() -> u32 {
+    fn get_end_frames(num_leds: &u16) -> Vec<u8> {
         // Note: according to https://cpldcpu.wordpress.com/2014/11/30/understanding-the-apa102-superled/
         // the end frame needs to consist of at least n/2 bits of 1, where n
         // in the number of LEDs in the strip.
         //
         // Using u32::MAX means we can only address a 64 LED strip
-        u32::MAX
+        vec![u8::MAX; Self::get_end_frame_count(num_leds).into()]
     }
 
     pub fn set_led_frames(&mut self, led_state: &LEDState) {
-        for i in 0..self.num_leds {
-            self.buffer[(i + 1) as usize] = Self::get_led_frame(led_state)
+        for i in 0..(self.num_leds as usize) {
+            let leds = Self::get_led_frame(led_state);
+            for (j, led) in leds.iter().enumerate() {
+                self.buffer[i + 1 + j] = *led;
+            }
         }
     }
 
     fn get_end_frame_count(num_leds: &u16) -> u16 {
-        (num_leds / 64) + 1
+        ((num_leds / 64) + 1) * 4
     }
 
-    fn get_required_vector_length(num_leds: &u16) -> u16 {
-        1 + num_leds + Self::get_end_frame_count(num_leds)
-    }
-
-    pub fn transition(&mut self, target: &LEDState) -> Result<(), rppal::gpio::Error> {
+    pub fn transition(&mut self, target: &LEDState) -> Result<(), rppal::spi::Error> {
         let start_time = time::Instant::now();
         while start_time.elapsed().as_secs_f32() < target.time {
             let delta_time: f32 = start_time.elapsed().as_secs_f32();
@@ -151,34 +144,18 @@ impl Frames {
         self.output_frames()
     }
 
-    fn initialise_frames(num_leds: &u16) -> Vec<u32> {
-        let length = Self::get_required_vector_length(num_leds) as usize;
-        let mut frames = vec![0; length];
-        frames[0] = Self::get_start_frame();
-        for frame in frames.iter_mut().skip(1 + (*num_leds as usize)) {
-            *frame = Self::get_end_frame();
-        }
+    fn initialise_frames(num_leds: &u16) -> Vec<u8> {
+        let mut frames: Vec<u8> = vec![];
+        let start_frames = Self::get_start_frame();
+        frames.extend(start_frames);
+        frames.extend(vec![0; (num_leds * 4).into()]);
+        frames.extend(Self::get_end_frames(num_leds));
         frames
     }
 
-    fn write_to_pin(
-        &self,
-        data_pin: &mut OutputPin,
-        clock_pin: &mut OutputPin,
-        num: &BitSlice<u32, Msb0>,
-    ) {
-        for b in num {
-            data_pin.write(Level::from(*b));
-            thread::sleep(time::Duration::from_secs_f32(self.clock_rate));
-            clock_pin.toggle();
-        }
-    }
-
-    pub fn output_frames(&self) -> Result<(), rppal::gpio::Error> {
-        let gpio = Gpio::new()?;
-        let mut data_pin = gpio.get(self.data_pin)?.into_output();
-        let mut clock_pin = gpio.get(self.clock_pin)?.into_output();
-        self.write_to_pin(&mut data_pin, &mut clock_pin, self.buffer.view_bits());
+    pub fn output_frames(&self) -> Result<(), rppal::spi::Error> {
+        let mut spi = Spi::new(Bus::Spi0, SlaveSelect::Ss0, self.clock_rate, Mode::Mode0).unwrap();
+        spi.write(&self.buffer)?;
         Ok(())
     }
 }
@@ -197,7 +174,7 @@ mod test {
                 red: 255,
                 time: 0.0,
             }),
-            0xffffffff
+            [0xff, 0xff, 0xff, 0xff]
         );
     }
 
@@ -211,7 +188,7 @@ mod test {
                 red: 0,
                 time: 0.0,
             }),
-            0xe0000000
+            [0xe0, 0x00, 0x00, 0x00]
         );
     }
 
@@ -225,7 +202,7 @@ mod test {
                 red: 0,
                 time: 0.0
             }),
-            0xffff0000
+            [0xff, 0xff, 0x00, 0x00]
         );
     }
 
@@ -239,7 +216,7 @@ mod test {
                 red: 0,
                 time: 0.0
             }),
-            0xff00ff00
+            [0xff, 0x00, 0xff, 0x00]
         );
     }
 
@@ -253,42 +230,27 @@ mod test {
                 red: 255,
                 time: 0.0
             }),
-            0xff0000ff
+            [0xff, 0x00, 0x00, 0xff]
         );
-    }
-
-    #[test]
-    fn test_check_expected_vector_length() {
-        assert_eq!(Frames::get_required_vector_length(&1), 3);
-        assert_eq!(Frames::get_required_vector_length(&63), 1 + 63 + 1);
-        // NOTE: not sure if 64 should have 2 end frames or 1, but having 2 is safer for now. will have
-        // to test after wiring up
-        assert_eq!(Frames::get_required_vector_length(&64), 1 + 64 + 2);
-        assert_eq!(Frames::get_required_vector_length(&65), 1 + 65 + 2);
     }
 
     #[test]
     fn test_vector_initialised_correctly() {
-        assert_eq!(Frames::initialise_frames(&1), vec![0, 0, 0xffffffff]);
-        assert_eq!(Frames::initialise_frames(&2), vec![0, 0, 0, 0xffffffff]);
-        assert_eq!(
-            Frames::initialise_frames(&63),
-            vec![
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0xffffffff
-            ]
-        );
-        assert_eq!(
-            Frames::initialise_frames(&64),
-            // NOTE: not sure if 64 should have 2 end frames or 1, but having 2 is safer for now. will have
-            // to test after wiring up
-            vec![
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0xffffffff, 0xffffffff
-            ]
-        );
+        fn checker(mut frames: Vec<u8>, expected_len: usize, expected_0xff_count: usize) {
+            assert_eq!(frames.len(), expected_len);
+            frames.reverse();
+            for (i, v) in frames.iter().enumerate() {
+                if i < expected_0xff_count {
+                    assert_eq!(*v, 0xff);
+                }
+                else {
+                    assert_eq!(*v, 0);
+                }
+            }
+        }
+        checker(Frames::initialise_frames(&1), 12, 4);
+        checker(Frames::initialise_frames(&2), 16, 4);
+        checker(Frames::initialise_frames(&64), (1 + 64+ 2) * 4, 8);
     }
 
     #[test]
@@ -341,5 +303,32 @@ mod test {
             &LEDState::lerp(&init, &target, 7.5),
             &state_7_point_5
         ));
+    }
+
+    #[test]
+    fn test_red_output_for_2_seconds() {
+        let mut frames = Frames::new(1, 15_000_000);
+        let target: LEDState = LEDState::new(255, 0, 0, 255, 0.1);
+        let result = frames.transition(&target);
+        thread::sleep(time::Duration::from_secs(2));
+        assert!(result.is_ok());
+    }
+    
+    #[test]
+    fn test_green_output_for_2_seconds() {
+        let mut frames = Frames::new(1, 15_000_000);
+        let target: LEDState = LEDState::new(255, 0, 255, 0, 0.1);
+        let result = frames.transition(&target);
+        thread::sleep(time::Duration::from_secs(2));
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_blue_output_for_2_seconds() {
+        let mut frames = Frames::new(1, 15_000_000);
+        let target: LEDState = LEDState::new(255, 255, 0, 0, 0.1);
+        let result = frames.transition(&target);
+        thread::sleep(time::Duration::from_secs(2));
+        assert!(result.is_ok());
     }
 }
