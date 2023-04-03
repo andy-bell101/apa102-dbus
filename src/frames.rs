@@ -331,4 +331,13 @@ mod test {
         thread::sleep(time::Duration::from_secs(2));
         assert!(result.is_ok());
     }
+
+    #[test]
+    fn test_clear_leds_post_testing() {
+        let mut frames = Frames::new(1, 15_000_000);
+        let target: LEDState = LEDState::new(0, 0, 0, 0, 0.1);
+        let result = frames.transition(&target);
+        thread::sleep(time::Duration::from_secs(2));
+        assert!(result.is_ok());
+    }
 }
