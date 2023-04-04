@@ -115,14 +115,15 @@ impl Frames {
         // in the number of LEDs in the strip.
         //
         // Using u32::MAX means we can only address a 64 LED strip
-        vec![u8::MAX; Self::get_end_frame_count(num_leds).into()]
+        vec![0; Self::get_end_frame_count(num_leds).into()]
     }
 
     pub fn set_led_frames(&mut self, led_state: &LEDState) {
         for i in 0..(self.num_leds as usize) {
             let leds = Self::get_led_frame(led_state);
+            let index = (i + 1) * 4;
             for (j, led) in leds.iter().enumerate() {
-                self.buffer[i + 1 + j] = *led;
+                self.buffer[index + j] = *led;
             }
         }
     }
@@ -242,15 +243,14 @@ mod test {
             for (i, v) in frames.iter().enumerate() {
                 if i < expected_0xff_count {
                     assert_eq!(*v, 0xff);
-                }
-                else {
+                } else {
                     assert_eq!(*v, 0);
                 }
             }
         }
         checker(Frames::initialise_frames(&1), 12, 4);
         checker(Frames::initialise_frames(&2), 16, 4);
-        checker(Frames::initialise_frames(&64), (1 + 64+ 2) * 4, 8);
+        checker(Frames::initialise_frames(&64), (1 + 64 + 2) * 4, 8);
     }
 
     #[test]
@@ -305,39 +305,50 @@ mod test {
         ));
     }
 
+    const TESTING_NUM_LEDS: u16 = 60;
+
     #[test]
     fn test_red_output_for_2_seconds() {
-        let mut frames = Frames::new(1, 15_000_000);
+        let mut frames = Frames::new(TESTING_NUM_LEDS, 15_000_000);
         let target: LEDState = LEDState::new(255, 0, 0, 255, 0.1);
         let result = frames.transition(&target);
-        thread::sleep(time::Duration::from_secs(2));
         assert!(result.is_ok());
     }
-    
+
     #[test]
     fn test_green_output_for_2_seconds() {
-        let mut frames = Frames::new(1, 15_000_000);
+        let mut frames = Frames::new(TESTING_NUM_LEDS, 15_000_000);
         let target: LEDState = LEDState::new(255, 0, 255, 0, 0.1);
         let result = frames.transition(&target);
-        thread::sleep(time::Duration::from_secs(2));
         assert!(result.is_ok());
     }
 
     #[test]
     fn test_blue_output_for_2_seconds() {
-        let mut frames = Frames::new(1, 15_000_000);
+        let mut frames = Frames::new(TESTING_NUM_LEDS, 15_000_000);
         let target: LEDState = LEDState::new(255, 255, 0, 0, 0.1);
         let result = frames.transition(&target);
-        thread::sleep(time::Duration::from_secs(2));
         assert!(result.is_ok());
     }
 
     #[test]
     fn test_clear_leds_post_testing() {
-        let mut frames = Frames::new(1, 15_000_000);
+        let mut frames = Frames::new(TESTING_NUM_LEDS, 15_000_000);
         let target: LEDState = LEDState::new(0, 0, 0, 0, 0.1);
         let result = frames.transition(&target);
-        thread::sleep(time::Duration::from_secs(2));
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_rgb_roundtrip() {
+        let mut frames = Frames::new(TESTING_NUM_LEDS, 15_000_000);
+        let red = LEDState::new(255, 0, 0, 255, 1.0);
+        let green = LEDState::new(255, 0, 255, 0, 1.0);
+        let blue = LEDState::new(255, 255, 0, 0, 1.0);
+        let clear = LEDState::new(0, 0, 0, 0, 1.0);
+        assert!(frames.transition(&red).is_ok());
+        assert!(frames.transition(&green).is_ok());
+        assert!(frames.transition(&blue).is_ok());
+        assert!(frames.transition(&clear).is_ok());
     }
 }
