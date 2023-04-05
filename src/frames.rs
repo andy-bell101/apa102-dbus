@@ -145,6 +145,7 @@ impl Frames {
         // make sure we actually achieved the final state, in case of rounding
         // errors in the lerp
         self.set_led_frames(target);
+        self.state = *target;
         self.output_frames()
     }
 
