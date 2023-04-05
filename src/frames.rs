@@ -18,7 +18,7 @@ fn lerp_single(start: u8, end: u8, factor: f32) -> u8 {
 impl LEDState {
     pub fn new(brightness: u8, blue: u8, green: u8, red: u8, time: f32) -> Self {
         Self {
-            brightness,
+            brightness: if brightness > 31 { 31 } else { brightness },
             blue,
             green,
             red,
