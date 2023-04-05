@@ -2,7 +2,7 @@ use std::{thread, time};
 
 use rppal::spi::{Bus, Mode, SlaveSelect, Spi};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub struct LEDState {
     brightness: u8,
     blue: u8,
@@ -76,15 +76,17 @@ pub struct Frames {
     buffer: Vec<u8>,
     num_leds: u16,
     clock_rate: u32,
+    sleep_duration: time::Duration,
 }
 
 impl Frames {
-    pub fn new(num_leds: u16, clock_rate: u32) -> Self {
+    pub fn new(num_leds: u16, clock_rate: u32, sleep_duration_millis: u64) -> Self {
         Self {
             state: LEDState::new(0, 0, 0, 0, 0.0),
             buffer: Self::initialise_frames(&num_leds),
             num_leds,
             clock_rate,
+            sleep_duration: time::Duration::from_millis(sleep_duration_millis),
         }
     }
 
@@ -138,6 +140,7 @@ impl Frames {
             let delta_time: f32 = start_time.elapsed().as_secs_f32();
             self.set_led_frames(&LEDState::lerp(&self.state, target, delta_time));
             self.output_frames()?;
+            thread::sleep(self.sleep_duration);
         }
         // make sure we actually achieved the final state, in case of rounding
         // errors in the lerp
@@ -309,7 +312,7 @@ mod test {
 
     #[test]
     fn test_red_output_for_2_seconds() {
-        let mut frames = Frames::new(TESTING_NUM_LEDS, 15_000_000);
+        let mut frames = Frames::new(TESTING_NUM_LEDS, 15_000_000, 5);
         let target: LEDState = LEDState::new(255, 0, 0, 255, 0.1);
         let result = frames.transition(&target);
         assert!(result.is_ok());
@@ -317,7 +320,7 @@ mod test {
 
     #[test]
     fn test_green_output_for_2_seconds() {
-        let mut frames = Frames::new(TESTING_NUM_LEDS, 15_000_000);
+        let mut frames = Frames::new(TESTING_NUM_LEDS, 15_000_000, 5);
         let target: LEDState = LEDState::new(255, 0, 255, 0, 0.1);
         let result = frames.transition(&target);
         assert!(result.is_ok());
@@ -325,7 +328,7 @@ mod test {
 
     #[test]
     fn test_blue_output_for_2_seconds() {
-        let mut frames = Frames::new(TESTING_NUM_LEDS, 15_000_000);
+        let mut frames = Frames::new(TESTING_NUM_LEDS, 15_000_000, 5);
         let target: LEDState = LEDState::new(255, 255, 0, 0, 0.1);
         let result = frames.transition(&target);
         assert!(result.is_ok());
@@ -333,7 +336,7 @@ mod test {
 
     #[test]
     fn test_clear_leds_post_testing() {
-        let mut frames = Frames::new(TESTING_NUM_LEDS, 15_000_000);
+        let mut frames = Frames::new(TESTING_NUM_LEDS, 15_000_000, 5);
         let target: LEDState = LEDState::new(0, 0, 0, 0, 0.1);
         let result = frames.transition(&target);
         assert!(result.is_ok());
@@ -341,7 +344,7 @@ mod test {
 
     #[test]
     fn test_rgb_roundtrip() {
-        let mut frames = Frames::new(TESTING_NUM_LEDS, 15_000_000);
+        let mut frames = Frames::new(TESTING_NUM_LEDS, 15_000_000, 5);
         let red = LEDState::new(255, 0, 0, 255, 1.0);
         let green = LEDState::new(255, 0, 255, 0, 1.0);
         let blue = LEDState::new(255, 255, 0, 0, 1.0);
