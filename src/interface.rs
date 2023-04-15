@@ -19,8 +19,16 @@ impl RustApa102 {
         } else {
             worker::Job::OneOff(leds)
         };
-        self.job_tx.lock().unwrap().send(job).map_err(|e| zbus::fdo::Error::Failed(e.to_string()))?;
-        self.interrupt_tx.lock().unwrap().send(true).map_err(|e| zbus::fdo::Error::Failed(e.to_string()))?;
+        self.interrupt_tx
+            .lock()
+            .unwrap()
+            .send(true)
+            .map_err(|e| zbus::fdo::Error::Failed(e.to_string()))?;
+        self.job_tx
+            .lock()
+            .unwrap()
+            .send(job)
+            .map_err(|e| zbus::fdo::Error::Failed(e.to_string()))?;
         Ok(())
     }
 }
