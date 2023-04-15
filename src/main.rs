@@ -34,13 +34,20 @@ fn get_args_from_config_file() -> Option<Args> {
     let base_dir = xdg::BaseDirectories::new().ok()?;
     let file = base_dir.find_config_file("config.toml")?;
     let contents = fs::read_to_string(file).ok()?;
-    toml::to_string(&contents)
+    toml::from_str(&contents)
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let args_from_config = get_args_from_config_file();
-    let args_from_cli = Args::parse();
+    let args = get_args_from_config_file();
+    if let None = args {
+        panic!("bad config!");
+    }
+    let Args {
+        num_leds,
+        clock_rate,
+        sleep_duration,
+    } = args;
     let (job_tx, job_rx) = mpsc::channel();
     let (interrupt_tx, interrupt_rx) = mpsc::channel();
     #[allow(unused_must_use)]
