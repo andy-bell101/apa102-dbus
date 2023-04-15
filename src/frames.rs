@@ -42,6 +42,13 @@ impl LEDState {
         }
     }
 
+    fn cap_brightness(&self) -> Self {
+        Self {
+            brightness: if self.brightness > 31 { 31 } else { self.brightness },
+            ..*self
+        }
+    }
+
     fn lerp(init: &Self, target: &Self, cur_time: f32) -> Self {
         let t: f32 = cur_time / target.time;
         Self {
@@ -152,9 +159,10 @@ impl Frames {
         interrupt: &mpsc::Receiver<bool>,
     ) -> Interrupted<(), rppal::spi::Error> {
         let start_time = time::Instant::now();
-        while start_time.elapsed().as_secs_f32() < target.time {
+        let capped_target = target.cap_brightness();
+        while start_time.elapsed().as_secs_f32() < capped_target.time {
             let delta_time: f32 = start_time.elapsed().as_secs_f32();
-            self.set_led_frames(&LEDState::lerp(&self.state, target, delta_time));
+            self.set_led_frames(&LEDState::lerp(&self.state, &capped_target, delta_time));
             if let Err(e) = self.output_frames() {
                 return Interrupted::No(Err(e));
             }
@@ -167,8 +175,8 @@ impl Frames {
         }
         // make sure we actually achieved the final state, in case of rounding
         // errors in the lerp
-        self.set_led_frames(target);
-        self.state = *target;
+        self.set_led_frames(&capped_target);
+        self.state = capped_target;
         Interrupted::No(self.output_frames())
     }
 
