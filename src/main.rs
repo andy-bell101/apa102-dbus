@@ -4,6 +4,7 @@ use std::sync::mpsc;
 use std::sync::Mutex;
 use std::thread;
 
+use clap::Parser;
 use zbus::ConnectionBuilder;
 
 use crate::frames::Frames;
@@ -12,18 +13,30 @@ mod frames;
 mod interface;
 mod worker;
 
+#[derive(Parser, Debug)]
+struct Args {
+    /// Number of LEDs in the strip
+    #[arg(short, long)]
+    num_leds: u16,
+    #[arg(short, long)]
+    /// Clock rate to use
+    clock_rate: u32,
+    #[arg(short, long)]
+    /// Sleep duration between updates in milliseconds
+    sleep_duration: u16,
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let num_leds = 16;
-    let clock_rate = 1_500_000;
+    let Args {num_leds, clock_rate, sleep_duration} = Args::parse();
     let (job_tx, job_rx) = mpsc::channel();
     let (interrupt_tx, interrupt_rx) = mpsc::channel();
     #[allow(unused_must_use)]
     thread::spawn(move || {
-        worker::update_leds(&mut Frames::new(num_leds, clock_rate, 5), job_rx, interrupt_rx);
+        worker::update_leds(&mut Frames::new(num_leds, clock_rate, sleep_duration), job_rx, interrupt_rx);
     });
     let inst = interface::RustApa102 {
-        frames: Frames::new(num_leds, clock_rate, 5),
+        frames: Frames::new(num_leds, clock_rate, sleep_duration),
         job_tx: Mutex::new(job_tx),
         interrupt_tx: Mutex::new(interrupt_tx),
     };

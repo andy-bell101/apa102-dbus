@@ -11,3 +11,4 @@ tokio = { version = "1", features = ["full"] }
 rppal = "0.14.1"
 bitvec = "1"
 serde = "1"
+clap = { version = "4.2.2", features = ["derive"] }
