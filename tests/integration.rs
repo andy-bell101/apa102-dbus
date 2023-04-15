@@ -32,7 +32,7 @@ fn test_round_trip_via_threads() {
     assert!(job_tx
         .send(worker::Job::Repeat(vec![red, green, blue, clear]))
         .is_ok());
-    thread::sleep(Duration::from_secs(20));
+    thread::sleep(Duration::from_secs(10));
 
     let purple = frames::LEDState::new(255, 255, 0, 255, 1.0);
     assert!(job_tx.send(worker::Job::OneOff(vec![purple])).is_ok());
