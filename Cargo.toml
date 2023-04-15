@@ -14,3 +14,4 @@ bitvec = "1"
 serde = "1"
 clap = { version = "4.2.2", features = ["derive"] }
 xdg = "2.4.1"
+toml = "0.7.3"
