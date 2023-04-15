@@ -1,8 +1,24 @@
+use std::sync::mpsc;
 use std::{thread, time};
 
 use rppal::spi::{Bus, Mode, SlaveSelect, Spi};
+use serde::{Deserialize, Serialize};
+use zbus::zvariant::Type;
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq)]
+pub enum Interrupted<T, E> {
+    Yes,
+    No(Result<T, E>),
+}
+
+impl<T, E> Interrupted<T, E> {
+    #[cfg(test)]
+    fn is_ok(&self) -> bool {
+        matches!(self, Self::No(Ok(_)))
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize, Type)]
 pub struct LEDState {
     brightness: u8,
     blue: u8,
@@ -76,7 +92,7 @@ pub struct Frames {
     buffer: Vec<u8>,
     num_leds: u16,
     clock_rate: u32,
-    sleep_duration: time::Duration,
+    pub sleep_duration: time::Duration,
 }
 
 impl Frames {
@@ -88,10 +104,6 @@ impl Frames {
             clock_rate,
             sleep_duration: time::Duration::from_millis(sleep_duration_millis),
         }
-    }
-
-    pub fn update_current_led_state(&mut self, state: LEDState) {
-        self.state = state;
     }
 
     fn get_start_frame() -> [u8; 4] {
@@ -134,19 +146,30 @@ impl Frames {
         ((num_leds / 64) + 1) * 4
     }
 
-    pub fn transition(&mut self, target: &LEDState) -> Result<(), rppal::spi::Error> {
+    pub fn transition<'a>(
+        &'a mut self,
+        target: &LEDState,
+        interrupt: &mpsc::Receiver<bool>,
+    ) -> Interrupted<(), rppal::spi::Error> {
         let start_time = time::Instant::now();
         while start_time.elapsed().as_secs_f32() < target.time {
             let delta_time: f32 = start_time.elapsed().as_secs_f32();
             self.set_led_frames(&LEDState::lerp(&self.state, target, delta_time));
-            self.output_frames()?;
+            if let Err(e) = self.output_frames() {
+                return Interrupted::No(Err(e));
+            }
+            match interrupt.try_recv() {
+                Ok(_) => return Interrupted::Yes,
+                Err(mpsc::TryRecvError::Empty) => (),
+                Err(mpsc::TryRecvError::Disconnected) => panic!("Thread disconnected!"),
+            }
             thread::sleep(self.sleep_duration);
         }
         // make sure we actually achieved the final state, in case of rounding
         // errors in the lerp
         self.set_led_frames(target);
         self.state = *target;
-        self.output_frames()
+        Interrupted::No(self.output_frames())
     }
 
     fn initialise_frames(num_leds: &u16) -> Vec<u8> {
@@ -315,7 +338,8 @@ mod test {
     fn test_red_output_for_2_seconds() {
         let mut frames = Frames::new(TESTING_NUM_LEDS, 15_000_000, 5);
         let target: LEDState = LEDState::new(255, 0, 0, 255, 0.1);
-        let result = frames.transition(&target);
+        let (_tx, rx) = mpsc::channel();
+        let result = frames.transition(&target, &rx);
         assert!(result.is_ok());
     }
 
@@ -323,7 +347,8 @@ mod test {
     fn test_green_output_for_2_seconds() {
         let mut frames = Frames::new(TESTING_NUM_LEDS, 15_000_000, 5);
         let target: LEDState = LEDState::new(255, 0, 255, 0, 0.1);
-        let result = frames.transition(&target);
+        let (_tx, rx) = mpsc::channel();
+        let result = frames.transition(&target, &rx);
         assert!(result.is_ok());
     }
 
@@ -331,7 +356,8 @@ mod test {
     fn test_blue_output_for_2_seconds() {
         let mut frames = Frames::new(TESTING_NUM_LEDS, 15_000_000, 5);
         let target: LEDState = LEDState::new(255, 255, 0, 0, 0.1);
-        let result = frames.transition(&target);
+        let (_tx, rx) = mpsc::channel();
+        let result = frames.transition(&target, &rx);
         assert!(result.is_ok());
     }
 
@@ -339,7 +365,8 @@ mod test {
     fn test_clear_leds_post_testing() {
         let mut frames = Frames::new(TESTING_NUM_LEDS, 15_000_000, 5);
         let target: LEDState = LEDState::new(0, 0, 0, 0, 0.1);
-        let result = frames.transition(&target);
+        let (_tx, rx) = mpsc::channel();
+        let result = frames.transition(&target, &rx);
         assert!(result.is_ok());
     }
 
@@ -350,9 +377,10 @@ mod test {
         let green = LEDState::new(255, 0, 255, 0, 1.0);
         let blue = LEDState::new(255, 255, 0, 0, 1.0);
         let clear = LEDState::new(0, 0, 0, 0, 1.0);
-        assert!(frames.transition(&red).is_ok());
-        assert!(frames.transition(&green).is_ok());
-        assert!(frames.transition(&blue).is_ok());
-        assert!(frames.transition(&clear).is_ok());
+        let (_tx, rx) = mpsc::channel();
+        assert!(frames.transition(&red, &rx).is_ok());
+        assert!(frames.transition(&green, &rx).is_ok());
+        assert!(frames.transition(&blue, &rx).is_ok());
+        assert!(frames.transition(&clear, &rx).is_ok());
     }
 }

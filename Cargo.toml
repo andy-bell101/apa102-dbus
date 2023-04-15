@@ -10,3 +10,4 @@ zbus = { version = "3", default-features = false, features = ["tokio"] }
 tokio = { version = "1", features = ["full"] }
 rppal = "0.14.1"
 bitvec = "1"
+serde = "1"

@@ -1,55 +1,30 @@
 use std::error::Error;
 use std::future::pending;
+use std::sync::mpsc;
+use std::sync::Mutex;
+use std::thread;
 
-use frames::Frames;
-use zbus::{dbus_interface, ConnectionBuilder};
+use zbus::ConnectionBuilder;
+
+use crate::frames::Frames;
 
 mod frames;
-
-struct RustApa102 {
-    frames: Frames,
-}
-
-#[dbus_interface(name = "org.zbus.rust_apa102")]
-impl RustApa102 {
-    fn transition(
-        &mut self,
-        brightness: u8,
-        blue: u8,
-        green: u8,
-        red: u8,
-        time: f32,
-    ) -> Result<(), zbus::fdo::Error> {
-        let target = frames::LEDState::new(brightness, blue, green, red, time);
-        self.frames
-            .transition(&target)
-            .map_err(|e| zbus::Error::Failure(e.to_string()))?;
-        self.frames.update_current_led_state(target);
-        Ok(())
-    }
-
-    fn set(
-        &mut self,
-        brightness: u8,
-        blue: u8,
-        green: u8,
-        red: u8,
-    ) -> Result<(), zbus::fdo::Error> {
-        let target = frames::LEDState::new(brightness, blue, green, red, 0.01);
-        self.frames
-            .transition(&target)
-            .map_err(|e| zbus::Error::Failure(e.to_string()))?;
-        self.frames.update_current_led_state(target);
-        Ok(())
-    }
-}
+mod interface;
+mod worker;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let num_leds = 16;
     let clock_rate = 1_500_000;
-    let inst = RustApa102 {
+    let (job_tx, job_rx) = mpsc::channel();
+    let (interrupt_tx, interrupt_rx) = mpsc::channel();
+    thread::spawn(move || {
+        worker::update_leds(&mut Frames::new(num_leds, clock_rate, 5), job_rx, interrupt_rx);
+    });
+    let inst = interface::RustApa102 {
         frames: Frames::new(num_leds, clock_rate, 5),
+        job_tx: Mutex::new(job_tx),
+        interrupt_tx: Mutex::new(interrupt_tx),
     };
     let _conn = ConnectionBuilder::session()?
         .name("org.zbus.rust_apa102")?
