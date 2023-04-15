@@ -14,6 +14,9 @@ pub fn update_leds(
 ) -> Result<(), rppal::spi::Error> {
     loop {
         for job in job_rx.try_iter() {
+            // ignore any interrupts we receive before starting to prevent
+            // premature exits
+            let _ = interrupt_rx.try_recv();
             match job {
                 Job::OneOff(v) => {
                     for target in v {
