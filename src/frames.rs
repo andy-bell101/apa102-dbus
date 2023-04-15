@@ -5,6 +5,8 @@ use rppal::spi::{Bus, Mode, SlaveSelect, Spi};
 use serde::{Deserialize, Serialize};
 use zbus::zvariant::Type;
 
+const MAX_BRIGHTNESS: u8 = 31;
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum Interrupted<T, E> {
     Yes,
@@ -34,7 +36,11 @@ fn lerp_single(start: u8, end: u8, factor: f32) -> u8 {
 impl LEDState {
     pub fn new(brightness: u8, blue: u8, green: u8, red: u8, time: f32) -> Self {
         Self {
-            brightness: if brightness > 31 { 31 } else { brightness },
+            brightness: if brightness > MAX_BRIGHTNESS {
+                MAX_BRIGHTNESS
+            } else {
+                brightness
+            },
             blue,
             green,
             red,
@@ -44,7 +50,11 @@ impl LEDState {
 
     fn cap_brightness(&self) -> Self {
         Self {
-            brightness: if self.brightness > 31 { 31 } else { self.brightness },
+            brightness: if self.brightness > 31 {
+                31
+            } else {
+                self.brightness
+            },
             ..*self
         }
     }
