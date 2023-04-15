@@ -14,6 +14,7 @@ mod interface;
 mod worker;
 
 #[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
 struct Args {
     /// Number of LEDs in the strip
     #[arg(short, long)]
@@ -23,7 +24,7 @@ struct Args {
     clock_rate: u32,
     #[arg(short, long)]
     /// Sleep duration between updates in milliseconds
-    sleep_duration: u16,
+    sleep_duration: u64,
 }
 
 #[tokio::main]
