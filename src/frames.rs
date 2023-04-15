@@ -34,7 +34,7 @@ fn lerp_single(start: u8, end: u8, factor: f32) -> u8 {
 }
 
 impl LEDState {
-    pub fn new(brightness: u8, blue: u8, green: u8, red: u8, time: f32) -> Self {
+    pub fn new(brightness: u8, red: u8, green: u8, blue: u8, time: f32) -> Self {
         Self {
             brightness: if brightness > MAX_BRIGHTNESS {
                 MAX_BRIGHTNESS
@@ -355,7 +355,7 @@ mod test {
     #[test]
     fn test_red_output_for_2_seconds() {
         let mut frames = Frames::new(TESTING_NUM_LEDS, 15_000_000, 5);
-        let target: LEDState = LEDState::new(255, 0, 0, 255, 0.1);
+        let target: LEDState = LEDState::new(255, 255, 0, 0, 0.1);
         let (_tx, rx) = mpsc::channel();
         let result = frames.transition(&target, &rx);
         assert!(result.is_ok());
@@ -373,7 +373,7 @@ mod test {
     #[test]
     fn test_blue_output_for_2_seconds() {
         let mut frames = Frames::new(TESTING_NUM_LEDS, 15_000_000, 5);
-        let target: LEDState = LEDState::new(255, 255, 0, 0, 0.1);
+        let target: LEDState = LEDState::new(255, 0, 0, 255, 0.1);
         let (_tx, rx) = mpsc::channel();
         let result = frames.transition(&target, &rx);
         assert!(result.is_ok());
@@ -391,9 +391,9 @@ mod test {
     #[test]
     fn test_rgb_roundtrip() {
         let mut frames = Frames::new(TESTING_NUM_LEDS, 15_000_000, 5);
-        let red = LEDState::new(255, 0, 0, 255, 1.0);
+        let red = LEDState::new(255, 255, 0, 0, 1.0);
         let green = LEDState::new(255, 0, 255, 0, 1.0);
-        let blue = LEDState::new(255, 255, 0, 0, 1.0);
+        let blue = LEDState::new(255, 0, 0, 255, 1.0);
         let clear = LEDState::new(0, 0, 0, 0, 1.0);
         let (_tx, rx) = mpsc::channel();
         assert!(frames.transition(&red, &rx).is_ok());
