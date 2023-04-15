@@ -23,9 +23,9 @@ impl<T, E> Interrupted<T, E> {
 #[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize, Type)]
 pub struct LEDState {
     brightness: u8,
-    blue: u8,
-    green: u8,
     red: u8,
+    green: u8,
+    blue: u8,
     time: f32,
 }
 
