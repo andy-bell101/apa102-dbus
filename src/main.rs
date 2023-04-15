@@ -18,6 +18,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let clock_rate = 1_500_000;
     let (job_tx, job_rx) = mpsc::channel();
     let (interrupt_tx, interrupt_rx) = mpsc::channel();
+    #[allow(unused_must_use)]
     thread::spawn(move || {
         worker::update_leds(&mut Frames::new(num_leds, clock_rate, 5), job_rx, interrupt_rx);
     });
