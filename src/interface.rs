@@ -42,6 +42,15 @@ impl RustApa102 {
         self.transition(mapped, repeat)
     }
 
+    fn set(&mut self, led: LEDState) -> Result<(), Error> {
+        self.transition(vec![led], false)
+    }
+
+    fn set_hex(&mut self, hex: &str, brightness: u8, time: f32) -> Result<(), Error> {
+        let led = LEDState::from_hex(hex, brightness, time).map_err(|e| Error::Failed(e.to_string()))?;
+        self.transition(vec![led], false)
+    }
+
     fn flash(&mut self, led: LEDState) -> Result<(), Error> {
         self.transition(vec![led], false)
     }
