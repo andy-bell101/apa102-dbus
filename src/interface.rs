@@ -33,10 +33,10 @@ impl RustApa102 {
         Ok(())
     }
 
-    fn transition_hex(&mut self, leds: Vec<(&str, f32)>, repeat: bool) -> Result<(), Error> {
+    fn transition_hex(&mut self, leds: Vec<(&str, u8, f32)>, repeat: bool) -> Result<(), Error> {
         let mapped = leds
             .iter()
-            .map(|(s, t)| LEDState::from_hex(s, *t))
+            .map(|(s, b, t)| LEDState::from_hex(s, *b, *t))
             .collect::<Result<Vec<LEDState>, _>>()
             .map_err(|e| Error::Failed(e.to_string()))?;
         self.transition(mapped, repeat)
@@ -46,8 +46,8 @@ impl RustApa102 {
         self.transition(vec![led], false)
     }
 
-    fn flash_hex(&mut self, hex: &str, time: f32) -> Result<(), Error> {
-        let led = LEDState::from_hex(hex, time).map_err(|e| Error::Failed(e.to_string()))?;
+    fn flash_hex(&mut self, hex: &str, brightness: u8, time: f32) -> Result<(), Error> {
+        let led = LEDState::from_hex(hex, brightness, time).map_err(|e| Error::Failed(e.to_string()))?;
         self.transition(vec![led], false)
     }
 
@@ -55,8 +55,8 @@ impl RustApa102 {
         self.transition(vec![led, LEDState::new(0, 0, 0, 0, led.time)], true)
     }
 
-    fn pulse_hex(&mut self, hex: &str, time: f32) -> Result<(), Error> {
-        let led = LEDState::from_hex(hex, time).map_err(|e| Error::Failed(e.to_string()))?;
+    fn pulse_hex(&mut self, hex: &str, brightness: u8,time: f32) -> Result<(), Error> {
+        let led = LEDState::from_hex(hex, brightness, time).map_err(|e| Error::Failed(e.to_string()))?;
         self.transition(vec![led], true)
     }
 
@@ -64,15 +64,15 @@ impl RustApa102 {
         self.transition(vec![LEDState::new(0, 0, 0, 0, 1.0)], false)
     }
 
-    fn rainbow(&mut self, time: f32, repeat: bool) -> Result<(), Error> {
+    fn rainbow(&mut self, brightness: u8, time: f32, repeat: bool) -> Result<(), Error> {
         let v = vec![
-            LEDState::from_hex("0xffff0000", time).unwrap(), // red
-            LEDState::from_hex("0xffffa500", time).unwrap(), // orange
-            LEDState::from_hex("0xffffff00", time).unwrap(), // yellow
-            LEDState::from_hex("0xff008000", time).unwrap(), // green
-            LEDState::from_hex("0xff0000ff", time).unwrap(), // blue
-            LEDState::from_hex("0xff4b0082", time).unwrap(), // indigo
-            LEDState::from_hex("0xffee82ee", time).unwrap(), // violet
+            LEDState::from_hex("ff0000", brightness, time).unwrap(), // red
+            LEDState::from_hex("ffa500", brightness, time).unwrap(), // orange
+            LEDState::from_hex("ffff00", brightness, time).unwrap(), // yellow
+            LEDState::from_hex("008000", brightness, time).unwrap(), // green
+            LEDState::from_hex("0000ff", brightness, time).unwrap(), // blue
+            LEDState::from_hex("4b0082", brightness, time).unwrap(), // indigo
+            LEDState::from_hex("ee82ee", brightness, time).unwrap(), // violet
         ];
         self.transition(v, repeat)
     }
