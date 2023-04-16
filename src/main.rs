@@ -117,8 +117,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         interrupt_tx: Mutex::new(interrupt_tx),
     };
     let _conn = ConnectionBuilder::session()?
-        .name("org.zbus.rust_apa102")?
-        .serve_at("/org/zbus/rust_apa102", inst)?
+        .name("org.zbus.apa102-dbus")?
+        .serve_at("/org/zbus/apa102-dbus", inst)?
         .build()
         .await?;
 

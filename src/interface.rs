@@ -11,7 +11,7 @@ pub struct RustApa102 {
     pub interrupt_tx: Mutex<mpsc::Sender<bool>>,
 }
 
-#[dbus_interface(name = "org.zbus.rust_apa102")]
+#[dbus_interface(name = "org.zbus.apa102-dbus")]
 impl RustApa102 {
     fn transition(&mut self, leds: Vec<LEDState>, repeat: bool) -> Result<(), zbus::fdo::Error> {
         let job = if repeat {
