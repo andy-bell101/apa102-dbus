@@ -49,7 +49,7 @@ impl LEDState {
     }
 
     pub fn from_hex(hex: &str, time: f32) -> Result<Self, std::num::ParseIntError> {
-        let u: u32 = hex.parse()?;
+        let u: u32 = u32::from_str_radix(hex, 16)?;
         let [brightness, red, green, blue] = u.to_be_bytes();
         Ok(Self {brightness, red, green, blue, time})
     }
