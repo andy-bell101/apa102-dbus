@@ -48,6 +48,12 @@ impl LEDState {
         }
     }
 
+    pub fn from_hex(hex: &str, time: f32) -> Result<Self, std::num::ParseIntError> {
+        let u: u32 = hex.parse()?;
+        let [brightness, red, green, blue] = u.to_be_bytes();
+        Ok(Self {brightness, red, green, blue, time})
+    }
+
     fn cap_brightness(&self) -> Self {
         Self {
             brightness: if self.brightness > 31 {
