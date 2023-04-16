@@ -52,12 +52,12 @@ impl RustApa102 {
     }
 
     fn flash(&mut self, led: LEDState) -> Result<(), Error> {
-        self.transition(vec![led], false)
+        self.transition(vec![led, LEDState::new(0, 0, 0, 0, led.time)], false)
     }
 
     fn flash_hex(&mut self, hex: &str, brightness: u8, time: f32) -> Result<(), Error> {
         let led = LEDState::from_hex(hex, brightness, time).map_err(|e| Error::Failed(e.to_string()))?;
-        self.transition(vec![led], false)
+        self.transition(vec![led, LEDState::new(0, 0, 0, 0, led.time)], false)
     }
 
     fn pulse(&mut self, led: LEDState) -> Result<(), Error> {
@@ -66,7 +66,7 @@ impl RustApa102 {
 
     fn pulse_hex(&mut self, hex: &str, brightness: u8,time: f32) -> Result<(), Error> {
         let led = LEDState::from_hex(hex, brightness, time).map_err(|e| Error::Failed(e.to_string()))?;
-        self.transition(vec![led], true)
+        self.transition(vec![led, LEDState::new(0, 0, 0, 0, led.time)], true)
     }
 
     fn clear(&mut self) -> Result<(), Error> {
