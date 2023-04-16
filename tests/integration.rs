@@ -2,7 +2,7 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
-use rust_apa102::{frames, worker};
+use apa102_dbus::{frames, worker};
 
 #[test]
 fn test_round_trip_via_threads() {
