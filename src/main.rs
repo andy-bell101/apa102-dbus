@@ -36,7 +36,7 @@ struct Args {
 
 fn get_args_from_config_file() -> Option<Args> {
     let base_dir = xdg::BaseDirectories::new().ok()?;
-    let file = base_dir.find_config_file("config.toml")?;
+    let file = base_dir.find_config_file("apa102-dbus/config.toml")?;
     let contents = fs::read_to_string(file).ok()?;
     toml::from_str(&contents).ok()
 }
