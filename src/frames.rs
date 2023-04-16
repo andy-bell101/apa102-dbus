@@ -26,7 +26,7 @@ pub struct LEDState {
     red: u8,
     green: u8,
     blue: u8,
-    time: f32,
+    pub time: f32,
 }
 
 fn lerp_single(start: u8, end: u8, factor: f32) -> u8 {
@@ -163,8 +163,8 @@ impl Frames {
         ((num_leds / 64) + 1) * 4
     }
 
-    pub fn transition<'a>(
-        &'a mut self,
+    pub fn transition(
+        &mut self,
         target: &LEDState,
         interrupt: &mpsc::Receiver<bool>,
     ) -> Interrupted<(), rppal::spi::Error> {
