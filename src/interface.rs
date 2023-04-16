@@ -4,6 +4,7 @@ use std::sync::Mutex;
 use crate::frames::{Frames, LEDState};
 use crate::worker;
 use zbus::dbus_interface;
+use zbus::fdo::Error;
 
 pub struct RustApa102 {
     pub frames: Frames,
@@ -13,7 +14,7 @@ pub struct RustApa102 {
 
 #[dbus_interface(name = "org.zbus.apa102")]
 impl RustApa102 {
-    fn transition(&mut self, leds: Vec<LEDState>, repeat: bool) -> Result<(), zbus::fdo::Error> {
+    fn transition(&mut self, leds: Vec<LEDState>, repeat: bool) -> Result<(), Error> {
         let job = if repeat {
             worker::Job::Repeat(leds)
         } else {
@@ -23,39 +24,56 @@ impl RustApa102 {
             .lock()
             .unwrap()
             .send(true)
-            .map_err(|e| zbus::fdo::Error::Failed(e.to_string()))?;
+            .map_err(|e| Error::Failed(e.to_string()))?;
         self.job_tx
             .lock()
             .unwrap()
             .send(job)
-            .map_err(|e| zbus::fdo::Error::Failed(e.to_string()))?;
+            .map_err(|e| Error::Failed(e.to_string()))?;
         Ok(())
     }
 
-    fn flash(&mut self, led: LEDState) -> Result<(), zbus::fdo::Error> {
+    fn transition_hex(&mut self, leds: Vec<(&str, f32)>, repeat: bool) -> Result<(), Error> {
+        let mapped = leds
+            .iter()
+            .map(|(s, t)| LEDState::from_hex(s, *t))
+            .collect::<Result<Vec<LEDState>, _>>()
+            .map_err(|e| Error::Failed(e.to_string()))?;
+        self.transition(mapped, repeat)
+    }
+
+    fn flash(&mut self, led: LEDState) -> Result<(), Error> {
         self.transition(vec![led], false)
     }
 
-    fn pulse(&mut self, led: LEDState) -> Result<(), zbus::fdo::Error> {
+    fn flash_hex(&mut self, hex: &str, time: f32) -> Result<(), Error> {
+        let led = LEDState::from_hex(hex, time).map_err(|e| Error::Failed(e.to_string()))?;
+        self.transition(vec![led], false)
+    }
+
+    fn pulse(&mut self, led: LEDState) -> Result<(), Error> {
         self.transition(vec![led, LEDState::new(0, 0, 0, 0, led.time)], true)
     }
 
-    fn clear(&mut self) -> Result<(), zbus::fdo::Error> {
+    fn pulse_hex(&mut self, hex: &str, time: f32) -> Result<(), Error> {
+        let led = LEDState::from_hex(hex, time).map_err(|e| Error::Failed(e.to_string()))?;
+        self.transition(vec![led], true)
+    }
+
+    fn clear(&mut self) -> Result<(), Error> {
         self.transition(vec![LEDState::new(0, 0, 0, 0, 1.0)], false)
     }
 
-    fn rainbow(&mut self, time: f32, repeat: bool) -> Result<(), zbus::fdo::Error> {
+    fn rainbow(&mut self, time: f32, repeat: bool) -> Result<(), Error> {
         let v = vec![
-            LEDState::new(255, 0xff, 0x00, 0x00, time), // red
-            LEDState::new(255, 0xff, 0xa5, 0x00, time), // orange
-            LEDState::new(255, 0xff, 0xff, 0x00, time), // yellow
-            LEDState::new(255, 0x00, 0x80, 0x00, time), // green
-            LEDState::new(255, 0x00, 0x00, 0xff, time), // blue
-            LEDState::new(255, 0x4b, 0x00, 0x82, time), // indigo
-            LEDState::new(255, 0xee, 0x82, 0xee, time), // violet
+            LEDState::from_hex("0xffff0000", time).unwrap(), // red
+            LEDState::from_hex("0xffffa500", time).unwrap(), // orange
+            LEDState::from_hex("0xffffff00", time).unwrap(), // yellow
+            LEDState::from_hex("0xff008000", time).unwrap(), // green
+            LEDState::from_hex("0xff0000ff", time).unwrap(), // blue
+            LEDState::from_hex("0xff4b0082", time).unwrap(), // indigo
+            LEDState::from_hex("0xffee82ee", time).unwrap(), // violet
         ];
         self.transition(v, repeat)
     }
-
-    // TODO: flash_hex, pulse_hex, rainbow, transition_hex
 }
