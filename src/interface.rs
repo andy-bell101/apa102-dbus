@@ -31,4 +31,6 @@ impl RustApa102 {
             .map_err(|e| zbus::fdo::Error::Failed(e.to_string()))?;
         Ok(())
     }
+
+    // TODO: flash, flash_hex, pulse, pulse_hex, rainbow, transition_hex
 }
